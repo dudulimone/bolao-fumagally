@@ -686,21 +686,29 @@ async function showPalpiteId(rodada) {
   } else if (tipoRodada === 'apostas_gerais' || rodada === 'apostas_gerais') {
     form.innerHTML = `
       <div class="palpite-section">
-        <div class="palpite-label">Campeao</div><input type="text" id="pgCamp" list="teamsList">
+        <div class="palpite-label">Campeao</div>
+        <input type="text" id="pgCamp" list="teamsList" placeholder="Selecao campeã" oninput="syncSemis()">
       </div>
       <div class="palpite-section">
-        <div class="palpite-label">Vice</div><input type="text" id="pgVice" list="teamsList">
+        <div class="palpite-label">Vice</div>
+        <input type="text" id="pgVice" list="teamsList" placeholder="Selecao vice" oninput="syncSemis()">
       </div>
       <div class="palpite-section">
-        <div class="palpite-label">Semifinalistas (4 selecoes)</div>
-        <input type="text" id="pgS1" list="teamsList" placeholder="Semi 1" style="margin-bottom:6px">
-        <input type="text" id="pgS2" list="teamsList" placeholder="Semi 2" style="margin-bottom:6px">
-        <input type="text" id="pgS3" list="teamsList" placeholder="Semi 3" style="margin-bottom:6px">
-        <input type="text" id="pgS4" list="teamsList" placeholder="Semi 4">
+        <div class="palpite-label">Semifinalistas</div>
+        <div style="font-size:11px;color:#4a7a4e;margin-bottom:8px">Campeao e vice ja entram automaticamente. Escolha os outros 2.</div>
+        <div style="background:#0e1a10;border:1px solid #2a4a2d;border-radius:6px;padding:8px 10px;margin-bottom:6px;font-size:13px;color:#4a7a4e" id="pgS1Display">Campeao — preencha acima</div>
+        <div style="background:#0e1a10;border:1px solid #2a4a2d;border-radius:6px;padding:8px 10px;margin-bottom:6px;font-size:13px;color:#4a7a4e" id="pgS2Display">Vice — preencha acima</div>
+        <input type="hidden" id="pgS1">
+        <input type="hidden" id="pgS2">
+        <input type="text" id="pgS3" list="teamsList" placeholder="3o semifinalista" style="margin-bottom:6px">
+        <input type="text" id="pgS4" list="teamsList" placeholder="4o semifinalista">
       </div>
       <div class="palpite-section">
-        <div class="palpite-label">Artilheiro</div><input type="text" id="pgArt">
+        <div class="palpite-label">Artilheiro</div>
+        <input type="text" id="pgArt" placeholder="Nome do artilheiro">
       </div>`;
+    // Sincroniza imediatamente se estiver editando
+    setTimeout(syncSemis, 50);
   } else {
     // Mata-mata: busca jogo da rodada no banco
     const jogoSnap = await get(ref(db, `config/jogos/${rodada}`));
@@ -868,6 +876,32 @@ function atualizarContadorGrupos() {
 }
 window.atualizarContadorGrupos = atualizarContadorGrupos;
 
+function syncSemis() {
+  const camp = document.getElementById('pgCamp')?.value?.trim() || '';
+  const vice = document.getElementById('pgVice')?.value?.trim() || '';
+
+  // Atualiza campos hidden
+  const s1 = document.getElementById('pgS1');
+  const s2 = document.getElementById('pgS2');
+  if (s1) s1.value = camp;
+  if (s2) s2.value = vice;
+
+  // Atualiza display visual
+  const d1 = document.getElementById('pgS1Display');
+  const d2 = document.getElementById('pgS2Display');
+  if (d1) {
+    d1.textContent = camp || 'Campeao — preencha acima';
+    d1.style.color = camp ? '#5aba6a' : '#4a7a4e';
+    d1.style.borderColor = camp ? '#2a7a2e' : '#2a4a2d';
+  }
+  if (d2) {
+    d2.textContent = vice || 'Vice — preencha acima';
+    d2.style.color = vice ? '#5aba6a' : '#4a7a4e';
+    d2.style.borderColor = vice ? '#2a7a2e' : '#2a4a2d';
+  }
+}
+window.syncSemis = syncSemis;
+
 function atualizarContador() {
   const contador = document.getElementById('contadorClass');
   if (!contador) return;
@@ -903,8 +937,8 @@ async function editarPalpiteId(rodada) {
   } else if (d.tipo === 'apostas') {
     if (document.getElementById('pgCamp')) document.getElementById('pgCamp').value = d.campeao || '';
     if (document.getElementById('pgVice')) document.getElementById('pgVice').value = d.vice || '';
-    if (document.getElementById('pgS1'))   document.getElementById('pgS1').value   = d.s1 || '';
-    if (document.getElementById('pgS2'))   document.getElementById('pgS2').value   = d.s2 || '';
+    // s1 e s2 são sincronizados automaticamente do campeão e vice
+    syncSemis();
     if (document.getElementById('pgS3'))   document.getElementById('pgS3').value   = d.s3 || '';
     if (document.getElementById('pgS4'))   document.getElementById('pgS4').value   = d.s4 || '';
     if (document.getElementById('pgArt'))  document.getElementById('pgArt').value  = d.art || '';
@@ -954,7 +988,7 @@ async function enviarPalpite() {
     const palpite = document.getElementById('pdPalpite')?.value?.trim();
     if (!palpite) { toast('Escreva seu palpite!', 'error'); return; }
     dados = { ...dados, tipo:'diario', palpite, tipoPalpite: document.getElementById('pdTipo')?.value };
-  } else if (tipoRodada === 'apostas_gerais' || rodada === 'apostas_gerais') {
+  } else if (tipoRodada2 === 'apostas_gerais' || rodada === 'apostas_gerais') {
     const campeao = document.getElementById('pgCamp')?.value?.trim();
     // Salva parcial — pontos só pelo que foi preenchido
     if (!campeao && !document.getElementById('pgVice')?.value?.trim() && !document.getElementById('pgArt')?.value?.trim()) {
