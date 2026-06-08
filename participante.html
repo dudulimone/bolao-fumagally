@@ -652,7 +652,9 @@ async function showPalpite() {
 async function showPalpiteId(rodada) {
   if (!rodada) { toast('Nenhuma rodada aberta!', 'error'); return; }
   _rodadaAtual = rodada;
-  _palpiteAtual = null; // limpa palpite anterior
+  // NÃO limpa _palpiteAtual aqui — editarPalpiteId já o setou antes de chamar showPalpiteId
+  // Só limpa se for chamado diretamente (novo palpite)
+  if (!_editandoPalpite) _palpiteAtual = null;
   // Sempre reseta o botão ao abrir o formulário
   const btn = document.getElementById('btnEnviarPalpite');
   if (btn) { btn.disabled = false; btn.textContent = 'Enviar palpite'; }
@@ -937,8 +939,10 @@ async function editarPalpiteId(rodada) {
   const snap = await get(ref(db, `palpites/${currentUser.userKey}/${rodada}`));
   _palpiteAtual = snap.exists() ? snap.val() : null;
 
-  // Abre o formulário (já usa _palpiteAtual no setTimeout interno)
+  // Abre o formulário — _editandoPalpite evita que showPalpiteId zereo _palpiteAtual
+  _editandoPalpite = true;
   await showPalpiteId(rodada);
+  _editandoPalpite = false;
   document.getElementById('palpiteTitulo').textContent += ' (editando)';
   document.getElementById('btnEnviarPalpite').textContent = 'Atualizar palpite';
 
@@ -979,6 +983,7 @@ window.editarPalpiteId = editarPalpiteId;
 /* ── Enviar palpite ── */
 let _rodadaAtual = null; // setado por showPalpiteId
 let _palpiteAtual = null; // palpite existente para edição
+let _editandoPalpite = false; // flag para evitar que showPalpiteId zereo _palpiteAtual
 
 async function enviarPalpite() {
   const rodada = _rodadaAtual;
