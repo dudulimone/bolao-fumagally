@@ -670,7 +670,12 @@ function renderResultados(){
       ${Object.keys(allData.config?.jogos||{}).length?`
       <div class="scroll-table"><table>
         <thead><tr><th>Jogo</th><th>Fase</th><th>Placar real</th><th>Quem passou</th><th>Palpites recebidos</th></tr></thead>
-        <tbody>${Object.entries(allData.config.jogos||{}).map(([id,j])=>`<tr>
+        <tbody>${Object.entries(allData.config.jogos||{}).sort((a,b)=>{
+          const faseOrder={'16as de final':1,'Oitavas de final':2,'Quartas de final':3,'Semifinal':4,'Disputa 3o lugar':5,'Final':6};
+          const fa=faseOrder[a[1].fase]||99, fb=faseOrder[b[1].fase]||99;
+          if(fa!==fb) return fa-fb;
+          return (a[1].fecha_em||0)-(b[1].fecha_em||0);
+        }).map(([id,j])=>`<tr>
           <td><b>${esc(j.desc||id)}</b></td>
           <td><span class="badge badge-gray">${esc(j.fase||'')}</span></td>
           <td><input type="number" value="${r.jogos?.[id]?.ra??''}" onchange="setJogoRes('${id}','ra',this.value)" style="width:55px"> x <input type="number" value="${r.jogos?.[id]?.rb??''}" onchange="setJogoRes('${id}','rb',this.value)" style="width:55px"></td>
