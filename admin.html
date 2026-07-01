@@ -674,7 +674,9 @@ function renderResultados(){
           const faseOrder={'16as de final':1,'Oitavas de final':2,'Quartas de final':3,'Semifinal':4,'Disputa 3o lugar':5,'Final':6};
           const fa=faseOrder[a[1].fase]||99, fb=faseOrder[b[1].fase]||99;
           if(fa!==fb) return fa-fb;
-          return (a[1].fecha_em||0)-(b[1].fecha_em||0);
+          const fechaA=(allData.config?.rodadas?.[a[0]]?.fecha_em)||0;
+          const fechaB=(allData.config?.rodadas?.[b[0]]?.fecha_em)||0;
+          return fechaA-fechaB;
         }).map(([id,j])=>`<tr>
           <td><b>${esc(j.desc||id)}</b></td>
           <td><span class="badge badge-gray">${esc(j.fase||'')}</span></td>
