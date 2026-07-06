@@ -930,6 +930,17 @@ function renderPalpitesTable(rows){
   return`<div class="scroll-table"><table>
     <thead><tr><th>Participante</th><th>Rodada</th><th>Tipo</th><th>Palpite</th><th>Resultado</th><th>Data</th></tr></thead>
     <tbody>${rows.map(({uid,nome,rodada,dados})=>{
+      // Sem palpite — linha vazia
+      if(!dados){
+        return`<tr style="opacity:0.5">
+          <td style="color:#f5c518"><b>${esc(nome)}</b></td>
+          <td><span class="badge badge-gray">${esc(rodada)}</span></td>
+          <td>—</td>
+          <td style="color:#4a7a4e;font-style:italic">Não apostou</td>
+          <td></td>
+          <td>—</td>
+        </tr>`;
+      }
       const isDiario=dados.tipo==='diario';
       const acertou=dados.acertou||'';
       const pts=(dados.tipoPalpite==='zebra'||dados.tipoAposta==='artilheiro')?5:3;
@@ -1005,15 +1016,37 @@ window.filterPalpites=function(){
   const all=[];
   const ukNome2={};
   Object.entries(allData.users||{}).forEach(([uid,u])=>{ ukNome2[u.userKey||uid]=u.nome||uid; });
+
+  // Participantes que apostaram
+  const apostaram=new Set();
   Object.entries(allData.palpites||{}).forEach(([userKey,rodadas])=>{
     const nome=ukNome2[userKey]||allData.users?.[userKey]?.nome||userKey;
     if(q&&!nome.toLowerCase().includes(q))return;
     Object.entries(rodadas).forEach(([rodada,dados])=>{
       if(rodadaFiltro&&rodada!==rodadaFiltro)return;
+      apostaram.add(userKey);
       all.push({uid:userKey,nome,rodada,dados});
     });
   });
-  all.sort((a,b)=>b.dados.criado_em-a.dados.criado_em);
+
+  // Se filtro de rodada ativo, adiciona quem não apostou
+  if(rodadaFiltro){
+    Object.entries(allData.users||{}).forEach(([uid,u])=>{
+      const uk=u.userKey||uid;
+      const nome=u.nome||uid;
+      if(q&&!nome.toLowerCase().includes(q))return;
+      if(apostaram.has(uk))return;
+      all.push({uid:uk,nome,rodada:rodadaFiltro,dados:null});
+    });
+  }
+
+  all.sort((a,b)=>{
+    // Quem apostou primeiro, quem não apostou vai pro final
+    if(!a.dados&&b.dados)return 1;
+    if(a.dados&&!b.dados)return -1;
+    if(!a.dados&&!b.dados)return a.nome.localeCompare(b.nome);
+    return b.dados.criado_em-a.dados.criado_em;
+  });
   document.getElementById('palpitesTableWrap').innerHTML=renderPalpitesTable(all);
 };
 
