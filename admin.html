@@ -1017,25 +1017,25 @@ window.filterPalpites=function(){
   const ukNome2={};
   Object.entries(allData.users||{}).forEach(([uid,u])=>{ ukNome2[u.userKey||uid]=u.nome||uid; });
 
-  // Participantes que apostaram
-  const apostaram=new Set();
+  // Participantes que apostaram nesta rodada específica
+  const apostaramNaRodada=new Set();
   Object.entries(allData.palpites||{}).forEach(([userKey,rodadas])=>{
     const nome=ukNome2[userKey]||allData.users?.[userKey]?.nome||userKey;
     if(q&&!nome.toLowerCase().includes(q))return;
     Object.entries(rodadas).forEach(([rodada,dados])=>{
       if(rodadaFiltro&&rodada!==rodadaFiltro)return;
-      apostaram.add(userKey);
+      apostaramNaRodada.add(userKey);
       all.push({uid:userKey,nome,rodada,dados});
     });
   });
 
-  // Se filtro de rodada ativo, adiciona quem não apostou
+  // Se filtro de rodada ativo, adiciona quem não apostou nessa rodada
   if(rodadaFiltro){
     Object.entries(allData.users||{}).forEach(([uid,u])=>{
       const uk=u.userKey||uid;
       const nome=u.nome||uid;
       if(q&&!nome.toLowerCase().includes(q))return;
-      if(apostaram.has(uk))return;
+      if(apostaramNaRodada.has(uk))return;
       all.push({uid:uk,nome,rodada:rodadaFiltro,dados:null});
     });
   }
