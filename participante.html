@@ -200,7 +200,6 @@
       <div class="tab-bar">
         <div class="tab active" onclick="switchDashTab('ranking',this)">Ranking</div>
         <div class="tab" onclick="switchDashTab('historico',this)">Meu historico</div>
-        <div class="tab" onclick="switchDashTab('galera',this)">Galera</div>
         <div class="tab" onclick="switchDashTab('regras',this)">Regras</div>
       </div>
       <div id="dtRanking" class="tab-content">
@@ -209,15 +208,6 @@
       <div id="dtHistorico" class="tab-content" style="display:none">
         <div id="historicoLista" class="loading">Carregando...</div>
       </div>
-      <div id="dtGalera" class="tab-content" style="display:none">
-        <div style="padding:12px 0 8px">
-          <select id="galeraSelect" onchange="carregarGalera()" style="width:100%;background:#0e1a10;border:1px solid #2a4a2d;border-radius:8px;color:#d0e8d2;font-size:13px;padding:10px 12px;outline:none">
-            <option value="">— selecione uma rodada fechada —</option>
-          </select>
-        </div>
-        <div id="galeraConteudo"></div>
-      </div>
-
       <div id="dtRegras" class="tab-content" style="display:none">
         <div style="font-size:12px;line-height:1.8;color:#d0e8d2">
 
@@ -559,9 +549,6 @@ async function renderStatus() {
     badge.innerHTML = `<span class="status-badge status-open"><span class="status-dot"></span>${abertas.length} rodada${abertas.length>1?'s':''} aberta${abertas.length>1?'s':''}</span>`;
     desc.textContent = '';
 
-    // Ordena por fecha_em crescente — mais próxima de fechar aparece primeiro
-    abertas.sort((a,b) => (a[1].fecha_em||Infinity) - (b[1].fecha_em||Infinity));
-
     // Verifica quais já apostou
     let htmlRodadas = '';
     for(const [id, r] of abertas) {
@@ -638,15 +625,7 @@ async function renderStatus() {
 
 function renderRanking() {
   const el = document.getElementById('rankingLista');
-  const entries = Object.entries(rankingSnapshot).sort((a,b)=>{
-    const A=a[1], B=b[1];
-    if(B.total!==A.total) return B.total-A.total;
-    if(B.gerais!==A.gerais) return B.gerais-A.gerais;
-    if(B.mata!==A.mata) return B.mata-A.mata;
-    if(B.diario!==A.diario) return B.diario-A.diario;
-    if(B.class!==A.class) return B.class-A.class;
-    return (A.ultimoEdit||0)-(B.ultimoEdit||0);
-  });
+  const entries = Object.entries(rankingSnapshot).sort((a,b)=>b[1].total - a[1].total);
   if (!entries.length) { el.innerHTML = '<div class="empty">Nenhum ponto ainda.</div>'; return; }
   const medals = ['🥇','🥈','🥉'];
   el.innerHTML = entries.map(([uid, data], i) => `
@@ -675,7 +654,10 @@ function formatPalpiteResumido(data) {
     const status = data.acertou==='sim' ? '✓ Acertou' : data.acertou==='nao' ? '✗ Errou' : '⏳ Aguardando';
     return `${esc(data.palpite)} (${status})`;
   }
-  if (data.tipo === 'apostas')   return `Campeao: ${esc(data.campeao||'—')} · Vice: ${esc(data.vice||'—')}`;
+  if (data.tipo === 'apostas') {
+    const semis = [data.s1,data.s2,data.s3,data.s4].filter(Boolean).map(esc).join(', ') || '—';
+    return `Campeão: ${esc(data.campeao||'—')} · Vice: ${esc(data.vice||'—')} · Semis: ${semis} · Artilheiro: ${esc(data.art||'—')}`;
+  }
   if (data.tipo === 'mata_mata') return `${data.pa} x ${data.pb} · Passa: ${esc(data.passa||'—')}`;
   if (data.tipo === 'classificados') return `${data.acertos||0} acertos nos classificados`;
   return JSON.stringify(data).slice(0,60);
@@ -688,88 +670,8 @@ function switchDashTab(tab, btn) {
   document.getElementById(`dt${tab.charAt(0).toUpperCase()+tab.slice(1)}`).style.display='block';
   btn.classList.add('active');
   if (tab === 'historico') loadHistorico();
-  if (tab === 'galera') preencherSelectGalera();
 }
 window.switchDashTab = switchDashTab;
-
-function preencherSelectGalera() {
-  const sel = document.getElementById('galeraSelect');
-  if (!sel) return;
-  const rodadas = configSnapshot.rodadas || {};
-  const agora = Date.now();
-  // Só rodadas fechadas
-  const fechadas = Object.entries(rodadas).filter(([,r]) => {
-    if (r.status === 'fechada') return true;
-    if (r.fecha_em && agora >= r.fecha_em) return true;
-    return false;
-  }).sort((a,b) => (b[1].fecha_em||0) - (a[1].fecha_em||0));
-  sel.innerHTML = '<option value="">— selecione uma rodada fechada —</option>';
-  fechadas.forEach(([id, r]) => {
-    const opt = document.createElement('option');
-    opt.value = id;
-    opt.textContent = r.desc || id;
-    sel.appendChild(opt);
-  });
-  document.getElementById('galeraConteudo').innerHTML = '';
-}
-
-async function carregarGalera() {
-  const rodadaId = document.getElementById('galeraSelect')?.value;
-  const container = document.getElementById('galeraConteudo');
-  if (!rodadaId || !container) return;
-  container.innerHTML = '<div style="text-align:center;padding:20px;color:#4a7a4e">Carregando...</div>';
-
-  try {
-    // Busca todos os usuários e palpites da rodada
-    const [snapUsers, snapPalpites] = await Promise.all([
-      get(ref(db, 'users')),
-      get(ref(db, 'palpites'))
-    ]);
-    const users = snapUsers.val() || {};
-    const todosPalpites = snapPalpites.val() || {};
-
-    // Monta lista de participantes com palpite
-    const lista = Object.values(users).map(u => {
-      const uk = u.userKey;
-      const dado = todosPalpites[uk]?.[rodadaId] || null;
-      return { nome: u.nome, userKey: uk, dado };
-    }).sort((a,b) => a.nome.localeCompare(b.nome));
-
-    if (lista.length === 0) {
-      container.innerHTML = '<div style="text-align:center;padding:20px;color:#4a7a4e">Nenhum participante encontrado.</div>';
-      return;
-    }
-
-    let html = '<div style="margin-top:10px">';
-    lista.forEach(({ nome, userKey, dado }) => {
-      const isMe = userKey === currentUser.userKey;
-      const border = isMe ? '#f5c518' : '#2a4a2d';
-      const bg = isMe ? '#1e1800' : '#0e1a10';
-      const nameColor = isMe ? '#f5c518' : '#d0e8d2';
-      const tag = isMe ? ' <span style="font-size:9px;background:#f5c518;color:#000;border-radius:4px;padding:1px 5px;font-weight:900;vertical-align:middle">VOCÊ</span>' : '';
-
-      let palpiteTexto = '<span style="color:#4a7a4e">—</span>';
-      if (dado) {
-        if (dado.tipo === 'diario') palpiteTexto = `<span style="color:#a0d8a5">${esc(dado.palpite||'—')}</span>`;
-        else if (dado.tipo === 'mata_mata') palpiteTexto = `<span style="color:#a0d8a5">Placar: ${dado.pa??'?'} x ${dado.pb??'?'} · Passa: ${esc(dado.passa||'—')}</span>`;
-        else if (dado.tipo === 'apostas') palpiteTexto = `<span style="color:#a0d8a5">Campeão: ${esc(dado.campeao||'—')} · Vice: ${esc(dado.vice||'—')}</span>`;
-        else if (dado.tipo === 'classificados') palpiteTexto = `<span style="color:#a0d8a5">${dado.acertos||0} acertos</span>`;
-        else palpiteTexto = `<span style="color:#a0d8a5">${esc(JSON.stringify(dado).slice(0,60))}</span>`;
-      }
-
-      html += `<div style="background:${bg};border:1px solid ${border};border-radius:8px;padding:10px 12px;margin-bottom:6px">
-        <div style="font-size:13px;font-weight:700;color:${nameColor};margin-bottom:3px">${esc(nome)}${tag}</div>
-        <div style="font-size:12px">${palpiteTexto}</div>
-      </div>`;
-    });
-    html += '</div>';
-    container.innerHTML = html;
-  } catch(e) {
-    container.innerHTML = `<div style="color:#f08080;text-align:center;padding:20px">Erro ao carregar: ${e.message}</div>`;
-  }
-}
-window.carregarGalera = carregarGalera;
-window.preencherSelectGalera = preencherSelectGalera;
 
 /* ── Tela palpite ── */
 async function showPalpite() {
@@ -908,61 +810,15 @@ async function showPalpiteId(rodada) {
           <div class="match-team">${esc(jogo?.b||'Time B')}</div>
         </div>
         <div class="match-grid">
-          <input class="score-input" id="mmA" type="number" min="0" max="20" placeholder="">
+          <input class="score-input" id="mmA" type="number" min="0" max="20" placeholder="0">
           <div></div>
-          <input class="score-input" id="mmB" type="number" min="0" max="20" placeholder="">
+          <input class="score-input" id="mmB" type="number" min="0" max="20" placeholder="0">
         </div>
       </div>
-      <div class="palpite-section" style="padding:0">
-        <div style="font-size:11px;color:#4a7a4e;padding:0 0 4px 0">⚠️ Placar final com prorrogação incluída. Empatou? Escolha quem leva nos pênaltis.</div>
-      </div>
-      <div id="mmPassaWrap" class="palpite-section" style="display:none">
-        <div class="palpite-label">Quem avança?</div>
-        <div style="font-size:11px;color:#4a7a4e;margin-bottom:8px">Placar empatado — quem avança nos pênaltis?</div>
-        <div style="display:flex;gap:8px">
-          <button type="button" id="btnPassaA" style="flex:1;padding:10px;border-radius:8px;border:2px solid #2a4a2d;background:#0e1a10;color:#d0e8d2;font-size:13px;font-weight:700;cursor:pointer">${esc(jogo?.a||'Time A')}</button>
-          <button type="button" id="btnPassaB" style="flex:1;padding:10px;border-radius:8px;border:2px solid #2a4a2d;background:#0e1a10;color:#d0e8d2;font-size:13px;font-weight:700;cursor:pointer">${esc(jogo?.b||'Time B')}</button>
-        </div>
-        <input type="hidden" id="mmPassa">
+      <div class="palpite-section">
+        <div class="palpite-label">Quem avanca?</div>
+        <input type="text" id="mmPassa" list="teamsList" placeholder="Nome da selecao">
       </div>`;
-
-  // Monitora placar pra mostrar/esconder quem passa
-  setTimeout(()=>{
-    const mmA=document.getElementById('mmA');
-    const mmB=document.getElementById('mmB');
-    const btnA=document.getElementById('btnPassaA');
-    const btnB=document.getElementById('btnPassaB');
-    const passaInput=document.getElementById('mmPassa');
-    const wrap=document.getElementById('mmPassaWrap');
-
-    function selecionaPassaBtn(nome,btnSel,btnOther){
-      if(!passaInput)return;
-      passaInput.value=nome;
-      if(btnSel){btnSel.style.borderColor='#5aba6a';btnSel.style.background='#1a3a1e';}
-      if(btnOther){btnOther.style.borderColor='#2a4a2d';btnOther.style.background='#0e1a10';}
-    }
-    if(btnA) btnA.onclick=()=>selecionaPassaBtn(btnA.textContent,btnA,btnB);
-    if(btnB) btnB.onclick=()=>selecionaPassaBtn(btnB.textContent,btnB,btnA);
-
-    function checaEmpate(){
-      const a=parseInt(mmA?.value);
-      const b=parseInt(mmB?.value);
-      if(isNaN(a)||isNaN(b)){wrap.style.display='none';return;}
-      if(a===b){
-        wrap.style.display='block';
-      } else {
-        wrap.style.display='none';
-        // auto-define passa com vencedor
-        const vencedor=a>b?(btnA?.textContent||''):(btnB?.textContent||'');
-        if(passaInput) passaInput.value=vencedor;
-        // limpa visual
-        if(btnA){btnA.style.borderColor='#2a4a2d';btnA.style.background='#0e1a10';}
-        if(btnB){btnB.style.borderColor='#2a4a2d';btnB.style.background='#0e1a10';}
-      }
-    }
-    mmA?.addEventListener('input',checaEmpate);
-    mmB?.addEventListener('input',checaEmpate);
-  },100);
   }
 
   showScreen('screenPalpite');
@@ -1329,22 +1185,9 @@ async function editarPalpiteId(rodada) {
     atualizarBloqueios();
 
   } else if (d.tipo === 'mata_mata') {
-    if (document.getElementById('mmA')) document.getElementById('mmA').value = d.pa ?? '';
-    if (document.getElementById('mmB')) document.getElementById('mmB').value = d.pb ?? '';
-    // Dispara checaEmpate via evento input para mostrar/ocultar wrap corretamente
-    setTimeout(()=>{
-      document.getElementById('mmA')?.dispatchEvent(new Event('input'));
-      // Restaura passa salvo se for empate (botão correto destacado)
-      const wrap = document.getElementById('mmPassaWrap');
-      if(wrap && wrap.style.display !== 'none' && d.passa){
-        const btnA = document.getElementById('btnPassaA');
-        const btnB = document.getElementById('btnPassaB');
-        const passaInput = document.getElementById('mmPassa');
-        if(passaInput) passaInput.value = d.passa;
-        if(btnA && btnA.textContent === d.passa){btnA.style.borderColor='#5aba6a';btnA.style.background='#1a3a1e';}
-        if(btnB && btnB.textContent === d.passa){btnB.style.borderColor='#5aba6a';btnB.style.background='#1a3a1e';}
-      }
-    },150);
+    if (document.getElementById('mmA'))     document.getElementById('mmA').value     = d.pa ?? '';
+    if (document.getElementById('mmB'))     document.getElementById('mmB').value     = d.pb ?? '';
+    if (document.getElementById('mmPassa')) document.getElementById('mmPassa').value = d.passa || '';
   }
 }
 window.editarPalpiteId = editarPalpiteId;
@@ -1411,15 +1254,7 @@ async function enviarPalpite() {
   } else {
     const pa = document.getElementById('mmA')?.value;
     const pb = document.getElementById('mmB')?.value;
-    const btnA = document.getElementById('btnPassaA');
-    const btnB = document.getElementById('btnPassaB');
-    let passa = document.getElementById('mmPassa')?.value?.trim();
-    // Se placar definido e não empate, auto-define passa pelo vencedor
-    const paN = parseInt(pa), pbN = parseInt(pb);
-    if (!isNaN(paN) && !isNaN(pbN) && paN !== pbN) {
-      passa = paN > pbN ? (btnA?.textContent||'') : (btnB?.textContent||'');
-    }
-    if (!passa) { toast('Informe quem avança!', 'error'); return; }
+    const passa = document.getElementById('mmPassa')?.value?.trim();
     // Placar parcial aceito — sem placar, só pontua quem passa
     dados = { ...dados, tipo:'mata_mata', pa:+pa, pb:+pb, passa };
   }
