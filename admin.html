@@ -745,7 +745,8 @@ function calcTotals(){
     if(norm(ag.campeao)&&norm(ag.campeao)===norm(r.campeao))gerais+=10;
     if(norm(ag.vice)&&norm(ag.vice)===norm(r.vice))gerais+=6;
     if(norm(ag.art)&&norm(ag.art)===norm(r.artilheiro))gerais+=5;
-    [ag.s1,ag.s2,ag.s3,ag.s4].map(norm).filter(Boolean).forEach(s=>{if(realSemis.includes(s))gerais+=3;});
+    // Só s3 e s4 pontuam — s1 e s2 são campeão e vice, já pontuados acima
+    [ag.s3,ag.s4].map(norm).filter(Boolean).forEach(s=>{if(realSemis.includes(s))gerais+=3;});
 
     // Classificados
     const classP=meusPalpites['classificados']||{};
