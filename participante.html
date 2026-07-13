@@ -200,6 +200,7 @@
       <div class="tab-bar">
         <div class="tab active" onclick="switchDashTab('ranking',this)">Ranking</div>
         <div class="tab" onclick="switchDashTab('historico',this)">Meu historico</div>
+        <div class="tab" onclick="switchDashTab('galera',this)">Galera</div>
         <div class="tab" onclick="switchDashTab('regras',this)">Regras</div>
       </div>
       <div id="dtRanking" class="tab-content">
@@ -208,6 +209,15 @@
       <div id="dtHistorico" class="tab-content" style="display:none">
         <div id="historicoLista" class="loading">Carregando...</div>
       </div>
+      <div id="dtGalera" class="tab-content" style="display:none">
+        <div style="padding:12px 0 8px">
+          <select id="galeraSelect" onchange="carregarGalera()" style="width:100%;background:#0e1a10;border:1px solid #2a4a2d;border-radius:8px;color:#d0e8d2;font-size:13px;padding:10px 12px;outline:none">
+            <option value="">— selecione uma rodada fechada —</option>
+          </select>
+        </div>
+        <div id="galeraConteudo"></div>
+      </div>
+
       <div id="dtRegras" class="tab-content" style="display:none">
         <div style="font-size:12px;line-height:1.8;color:#d0e8d2">
 
@@ -670,8 +680,73 @@ function switchDashTab(tab, btn) {
   document.getElementById(`dt${tab.charAt(0).toUpperCase()+tab.slice(1)}`).style.display='block';
   btn.classList.add('active');
   if (tab === 'historico') loadHistorico();
+  if (tab === 'galera') preencherSelectGalera();
 }
 window.switchDashTab = switchDashTab;
+
+function preencherSelectGalera() {
+  const sel = document.getElementById('galeraSelect');
+  if (!sel) return;
+  const rodadas = configSnapshot.rodadas || {};
+  const agora = Date.now();
+  const fechadas = Object.entries(rodadas).filter(([,r]) => {
+    if (r.status === 'fechada') return true;
+    if (r.fecha_em && agora >= r.fecha_em) return true;
+    return false;
+  }).sort((a,b) => (b[1].fecha_em||0) - (a[1].fecha_em||0));
+  sel.innerHTML = '<option value="">— selecione uma rodada fechada —</option>';
+  fechadas.forEach(([id, r]) => {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = r.desc || id;
+    sel.appendChild(opt);
+  });
+  document.getElementById('galeraConteudo').innerHTML = '';
+}
+
+async function carregarGalera() {
+  const rodadaId = document.getElementById('galeraSelect')?.value;
+  const container = document.getElementById('galeraConteudo');
+  if (!rodadaId || !container) return;
+  container.innerHTML = '<div style="text-align:center;padding:20px;color:#4a7a4e">Carregando...</div>';
+  try {
+    const [snapUsers, snapPalpites] = await Promise.all([
+      get(ref(db, 'users')),
+      get(ref(db, 'palpites'))
+    ]);
+    const users = snapUsers.val() || {};
+    const todosPalpites = snapPalpites.val() || {};
+    const lista = Object.values(users).map(u => {
+      const uk = u.userKey;
+      const dado = todosPalpites[uk]?.[rodadaId] || null;
+      return { nome: u.nome, userKey: uk, dado };
+    }).sort((a,b) => a.nome.localeCompare(b.nome));
+    if (lista.length === 0) {
+      container.innerHTML = '<div style="text-align:center;padding:20px;color:#4a7a4e">Nenhum participante encontrado.</div>';
+      return;
+    }
+    let html = '<div style="margin-top:10px">';
+    lista.forEach(({ nome, userKey, dado }) => {
+      const isMe = userKey === currentUser.userKey;
+      const border = isMe ? '#f5c518' : '#2a4a2d';
+      const bg = isMe ? '#1e1800' : '#0e1a10';
+      const nameColor = isMe ? '#f5c518' : '#d0e8d2';
+      const tag = isMe ? ' <span style="font-size:9px;background:#f5c518;color:#000;border-radius:4px;padding:1px 5px;font-weight:900;vertical-align:middle">VOCÊ</span>' : '';
+      let palpiteTexto = '<span style="color:#4a7a4e">—</span>';
+      if (dado) palpiteTexto = `<span style="color:#a0d8a5">${formatPalpiteResumido(dado)}</span>`;
+      html += `<div style="background:${bg};border:1px solid ${border};border-radius:8px;padding:10px 12px;margin-bottom:6px">
+        <div style="font-size:13px;font-weight:700;color:${nameColor};margin-bottom:3px">${esc(nome)}${tag}</div>
+        <div style="font-size:12px">${palpiteTexto}</div>
+      </div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  } catch(e) {
+    container.innerHTML = `<div style="color:#f08080;text-align:center;padding:20px">Erro ao carregar: ${e.message}</div>`;
+  }
+}
+window.carregarGalera = carregarGalera;
+window.preencherSelectGalera = preencherSelectGalera;
 
 /* ── Tela palpite ── */
 async function showPalpite() {
