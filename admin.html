@@ -745,8 +745,8 @@ function calcTotals(){
     if(norm(ag.campeao)&&norm(ag.campeao)===norm(r.campeao))gerais+=10;
     if(norm(ag.vice)&&norm(ag.vice)===norm(r.vice))gerais+=6;
     if(norm(ag.art)&&norm(ag.art)===norm(r.artilheiro))gerais+=5;
-    // Só s3 e s4 pontuam — s1 e s2 são campeão e vice, já pontuados acima
-    [ag.s3,ag.s4].map(norm).filter(Boolean).forEach(s=>{if(realSemis.includes(s))gerais+=3;});
+    // Todos os 4 semifinalistas pontuam — campeão e vice acumulam com os 10/6 pts
+    [ag.s1,ag.s2,ag.s3,ag.s4].map(norm).filter(Boolean).forEach(s=>{if(realSemis.includes(s))gerais+=3;});
 
     // Classificados
     const classP=meusPalpites['classificados']||{};
@@ -770,9 +770,16 @@ function calcTotals(){
         if(!res)return;
         const mult=res.fase==='Final'?(allData.config?.finalMult||2):1;
         const exact=allData.config?.exact||5;
-        const passa=allData.config?.passa||3;
+        const passaPts=allData.config?.passa||3;
+        // Infere passa pelo placar quando campo está vazio
+        let passaPalpite=dados.passa;
+        if(!norm(passaPalpite)&&dados.pa!=null&&dados.pb!=null){
+          const paN=Number(dados.pa),pbN=Number(dados.pb);
+          if(paN>pbN) passaPalpite=res.a||'';
+          else if(pbN>paN) passaPalpite=res.b||'';
+        }
         if(Number(res.ra)===Number(dados.pa)&&Number(res.rb)===Number(dados.pb))mata+=exact*mult;
-        else if(norm(res.passa)===norm(dados.passa)&&norm(dados.passa))mata+=passa*mult;
+        else if(norm(res.passa)===norm(passaPalpite)&&norm(passaPalpite))mata+=passaPts*mult;
       }
     });
 
