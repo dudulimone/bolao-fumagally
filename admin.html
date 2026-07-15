@@ -773,11 +773,12 @@ function calcTotals(){
         const exact=allData.config?.exact||5;
         const passaPts=allData.config?.passa||3;
         // Infere passa pelo placar quando campo está vazio
-        let passaPalpite=dados.passa;
-        if(!norm(passaPalpite)&&dados.pa!=null&&dados.pb!=null){
+        let passaPalpite=(dados.passa||'').trim();
+        if(!passaPalpite&&dados.pa!=null&&dados.pb!=null){
+          const jogoConfig=allData.config?.jogos?.[rodada]||allData.config?.jogos?.[rodada.toLowerCase()]||{};
           const paN=Number(dados.pa),pbN=Number(dados.pb);
-          if(paN>pbN) passaPalpite=res.a||'';
-          else if(pbN>paN) passaPalpite=res.b||'';
+          if(paN>pbN) passaPalpite=jogoConfig.a||res.a||'';
+          else if(pbN>paN) passaPalpite=jogoConfig.b||res.b||'';
         }
         if(Number(res.ra)===Number(dados.pa)&&Number(res.rb)===Number(dados.pb))mata+=exact*mult;
         else if(norm(res.passa)===norm(passaPalpite)&&norm(passaPalpite))mata+=passaPts*mult;
