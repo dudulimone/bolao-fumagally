@@ -903,10 +903,54 @@ async function showPalpiteId(rodada) {
           <input class="score-input" id="mmB" type="number" min="0" max="20" placeholder="0">
         </div>
       </div>
-      <div class="palpite-section">
-        <div class="palpite-label">Quem avanca?</div>
-        <input type="text" id="mmPassa" list="teamsList" placeholder="Nome da selecao">
+      <div class="palpite-section" style="padding:0">
+        <div style="font-size:11px;color:#4a7a4e;padding:0 0 4px 0">⚠️ Placar final com prorrogação incluída. Empatou? Escolha quem leva nos pênaltis.</div>
+      </div>
+      <div id="mmPassaWrap" class="palpite-section" style="display:none">
+        <div class="palpite-label">Quem avança?</div>
+        <div style="font-size:11px;color:#4a7a4e;margin-bottom:8px">Placar empatado — quem avança nos pênaltis?</div>
+        <div style="display:flex;gap:8px">
+          <button type="button" id="btnPassaA" style="flex:1;padding:10px;border-radius:8px;border:2px solid #2a4a2d;background:#0e1a10;color:#d0e8d2;font-size:13px;font-weight:700;cursor:pointer">${esc(jogo?.a||'Time A')}</button>
+          <button type="button" id="btnPassaB" style="flex:1;padding:10px;border-radius:8px;border:2px solid #2a4a2d;background:#0e1a10;color:#d0e8d2;font-size:13px;font-weight:700;cursor:pointer">${esc(jogo?.b||'Time B')}</button>
+        </div>
+        <input type="hidden" id="mmPassa">
       </div>`;
+
+  // Monitora placar pra mostrar/esconder quem passa
+  setTimeout(()=>{
+    const mmA=document.getElementById('mmA');
+    const mmB=document.getElementById('mmB');
+    const btnA=document.getElementById('btnPassaA');
+    const btnB=document.getElementById('btnPassaB');
+    const passaInput=document.getElementById('mmPassa');
+    const wrap=document.getElementById('mmPassaWrap');
+
+    function selecionaPassaBtn(nome,btnSel,btnOther){
+      if(!passaInput)return;
+      passaInput.value=nome;
+      if(btnSel){btnSel.style.borderColor='#5aba6a';btnSel.style.background='#1a3a1e';}
+      if(btnOther){btnOther.style.borderColor='#2a4a2d';btnOther.style.background='#0e1a10';}
+    }
+    if(btnA) btnA.onclick=()=>selecionaPassaBtn(btnA.textContent,btnA,btnB);
+    if(btnB) btnB.onclick=()=>selecionaPassaBtn(btnB.textContent,btnB,btnA);
+
+    function checaEmpate(){
+      const a=parseInt(mmA?.value);
+      const b=parseInt(mmB?.value);
+      if(isNaN(a)||isNaN(b)){wrap.style.display='none';return;}
+      if(a===b){
+        wrap.style.display='block';
+      } else {
+        wrap.style.display='none';
+        const vencedor=a>b?(btnA?.textContent||''):(btnB?.textContent||'');
+        if(passaInput) passaInput.value=vencedor;
+        if(btnA){btnA.style.borderColor='#2a4a2d';btnA.style.background='#0e1a10';}
+        if(btnB){btnB.style.borderColor='#2a4a2d';btnB.style.background='#0e1a10';}
+      }
+    }
+    mmA?.addEventListener('input',checaEmpate);
+    mmB?.addEventListener('input',checaEmpate);
+  },100);
   }
 
   showScreen('screenPalpite');
@@ -1273,9 +1317,20 @@ async function editarPalpiteId(rodada) {
     atualizarBloqueios();
 
   } else if (d.tipo === 'mata_mata') {
-    if (document.getElementById('mmA'))     document.getElementById('mmA').value     = d.pa ?? '';
-    if (document.getElementById('mmB'))     document.getElementById('mmB').value     = d.pb ?? '';
-    if (document.getElementById('mmPassa')) document.getElementById('mmPassa').value = d.passa || '';
+    if (document.getElementById('mmA')) document.getElementById('mmA').value = d.pa ?? '';
+    if (document.getElementById('mmB')) document.getElementById('mmB').value = d.pb ?? '';
+    setTimeout(()=>{
+      document.getElementById('mmA')?.dispatchEvent(new Event('input'));
+      const wrap = document.getElementById('mmPassaWrap');
+      if(wrap && wrap.style.display !== 'none' && d.passa){
+        const btnA = document.getElementById('btnPassaA');
+        const btnB = document.getElementById('btnPassaB');
+        const passaInput = document.getElementById('mmPassa');
+        if(passaInput) passaInput.value = d.passa;
+        if(btnA && btnA.textContent === d.passa){btnA.style.borderColor='#5aba6a';btnA.style.background='#1a3a1e';}
+        if(btnB && btnB.textContent === d.passa){btnB.style.borderColor='#5aba6a';btnB.style.background='#1a3a1e';}
+      }
+    },150);
   }
 }
 window.editarPalpiteId = editarPalpiteId;
