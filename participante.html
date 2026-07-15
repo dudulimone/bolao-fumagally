@@ -524,6 +524,9 @@ function loadDashboard() {
     configSnapshot.rodadas = snap.val() || {};
     renderStatus();
   });
+  onValue(ref(db, 'config/jogos'), snap => {
+    configSnapshot.jogos = snap.val() || {};
+  });
   onValue(ref(db, 'ranking_cache'), snap => {
     rankingSnapshot = snap.val() || {};
     renderRanking();
@@ -612,7 +615,7 @@ async function renderStatus() {
       for (const [id, r] of fechadas) {
         const snap = await get(ref(db, `palpites/${currentUser.userKey}/${id}`));
         if (!snap.exists()) continue;
-        const d = snap.val();
+        const d = snap.val(); d._rodadaId = id;
         const statusColor = d.acertou==='sim' ? '#5aba6a' : d.acertou==='nao' ? '#f08080' : '#f5c518';
         const statusIcon  = d.acertou==='sim' ? '✓' : d.acertou==='nao' ? '✗' : '⏳';
         htmlFechadas += `<div style="background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer" onclick="verPalpiteFechado('${id}')">
@@ -651,12 +654,12 @@ async function loadHistorico() {
   const el   = document.getElementById('historicoLista');
   if (!snap.exists()) { el.innerHTML = '<div class="empty">Nenhum palpite registrado ainda.</div>'; return; }
   const palpites = snap.val();
-  el.innerHTML = Object.entries(palpites).sort((a,b)=>b[1].criado_em - a[1].criado_em).map(([rodada, data]) => `
+  el.innerHTML = Object.entries(palpites).sort((a,b)=>b[1].criado_em - a[1].criado_em).map(([rodada, data]) => {data._rodadaId=rodada; return `
     <div class="hist-item">
       <div class="hist-rodada">${esc(rodada)}</div>
       <div class="hist-valor">${formatPalpiteResumido(data)}</div>
       <div class="hist-meta">${new Date(data.criado_em).toLocaleString('pt-BR')}</div>
-    </div>`).join('');
+    </div>`;}).join('');
 }
 
 function formatPalpiteResumido(data) {
@@ -668,7 +671,17 @@ function formatPalpiteResumido(data) {
     const semis = [data.s1,data.s2,data.s3,data.s4].filter(Boolean).map(esc).join(', ') || '—';
     return `Campeão: ${esc(data.campeao||'—')} · Vice: ${esc(data.vice||'—')} · Semis: ${semis} · Artilheiro: ${esc(data.art||'—')}`;
   }
-  if (data.tipo === 'mata_mata') return `${data.pa} x ${data.pb} · Passa: ${esc(data.passa||'—')}`;
+  if (data.tipo === 'mata_mata') {
+    let passa = data.passa;
+    // Infere passa pelo placar quando campo está vazio
+    if (!passa && data.rodadaId && data.pa != null && data.pb != null) {
+      const jogo = configSnapshot.jogos?.[data.rodadaId];
+      const paN = Number(data.pa), pbN = Number(data.pb);
+      if (paN > pbN) passa = jogo?.a || '';
+      else if (pbN > paN) passa = jogo?.b || '';
+    }
+    return `${data.pa} x ${data.pb} · Passa: ${esc(passa||'—')}`;
+  }
   if (data.tipo === 'classificados') return `${data.acertos||0} acertos nos classificados`;
   return JSON.stringify(data).slice(0,60);
 }

@@ -764,9 +764,10 @@ function calcTotals(){
     });
 
     // Mata-mata
+    const jogosLower=Object.fromEntries(Object.entries(jogos).map(([k,v])=>[k.toLowerCase(),v]));
     Object.entries(meusPalpites).forEach(([rodada,dados])=>{
       if(dados.tipo==='mata_mata'){
-        const res=jogos[rodada];
+        const res=jogos[rodada]||jogosLower[rodada.toLowerCase()];
         if(!res)return;
         const mult=res.fase==='Final'?(allData.config?.finalMult||2):1;
         const exact=allData.config?.exact||5;
