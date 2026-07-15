@@ -1013,12 +1013,15 @@ function formatResumoPalpite(d,rodadaId){
   ].join('<br>');
   if(d.tipo==='mata_mata'){
     let passa=d.passa;
-    if(!passa&&rodadaId&&d.pa!=null&&d.pb!=null){
+    if(!passa||passa.trim()===''){
       const jogos=allData.config?.jogos||{};
-      const jogo=jogos[rodadaId]||jogos[rodadaId?.toLowerCase()];
+      const rid=d.rodada||rodadaId||'';
+      const jogo=jogos[rid]||jogos[rid.toLowerCase()]||jogos[rid.toUpperCase()];
       const paN=Number(d.pa),pbN=Number(d.pb);
-      if(paN>pbN) passa=jogo?.a||'';
-      else if(pbN>paN) passa=jogo?.b||'';
+      if(!isNaN(paN)&&!isNaN(pbN)){
+        if(paN>pbN) passa=jogo?.a||'';
+        else if(pbN>paN) passa=jogo?.b||'';
+      }
     }
     return `Placar: ${d.pa??'—'} x ${d.pb??'—'} · Passa: ${esc(passa||'—')}`;
   }
