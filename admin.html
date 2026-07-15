@@ -977,7 +977,7 @@ function renderPalpitesTable(rows){
         <td style="color:#f5c518"><b>${esc(nome)}</b></td>
         <td><span class="badge badge-gray">${esc(rodada)}</span></td>
         <td><span class="badge badge-blue">${esc(dados.tipo||'—')}</span>${isDiario&&dados.tipoPalpite==='zebra'?'<span class="badge badge-yellow" style="margin-left:4px">Zebra</span>':''}</td>
-        <td style="font-size:11px;color:#a0d8a5;max-width:280px">${formatResumoPalpite(dados)}</td>
+        <td style="font-size:11px;color:#a0d8a5;max-width:280px">${formatResumoPalpite(dados,rodada)}</td>
         ${acertoCell}
         <td style="color:#4a7a4e;font-size:11px">${new Date(dados.criado_em).toLocaleString('pt-BR')}</td>
       </tr>`;
@@ -1003,7 +1003,7 @@ window.marcarAcerto=async function(uid,rodada,valor){
   if(filtroRodada||filtroBusca) filterPalpites();
 };
 
-function formatResumoPalpite(d){
+function formatResumoPalpite(d,rodadaId){
   if(d.tipo==='diario') return esc(d.palpite||'—');
   if(d.tipo==='apostas') return [
     `<b style="color:#f5c518">Camp:</b> ${esc(d.campeao||'—')}`,
@@ -1011,7 +1011,17 @@ function formatResumoPalpite(d){
     `<b style="color:#f5c518">Semis:</b> ${[d.s1,d.s2,d.s3,d.s4].filter(Boolean).map(esc).join(', ')||'—'}`,
     `<b style="color:#f5c518">Art:</b> ${esc(d.art||'—')}`
   ].join('<br>');
-  if(d.tipo==='mata_mata') return `Placar: ${d.pa??'—'} x ${d.pb??'—'} · Passa: ${esc(d.passa||'—')}`;
+  if(d.tipo==='mata_mata'){
+    let passa=d.passa;
+    if(!passa&&rodadaId&&d.pa!=null&&d.pb!=null){
+      const jogos=allData.config?.jogos||{};
+      const jogo=jogos[rodadaId]||jogos[rodadaId?.toLowerCase()];
+      const paN=Number(d.pa),pbN=Number(d.pb);
+      if(paN>pbN) passa=jogo?.a||'';
+      else if(pbN>paN) passa=jogo?.b||'';
+    }
+    return `Placar: ${d.pa??'—'} x ${d.pb??'—'} · Passa: ${esc(passa||'—')}`;
+  }
   if(d.tipo==='classificados'){
     const s=d.selecoes||[];
     return `<span style="color:#7aaa7e">${s.length}/32:</span> ${s.map(esc).join(', ')||'—'}`;
