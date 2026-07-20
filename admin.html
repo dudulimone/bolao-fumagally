@@ -724,7 +724,7 @@ window.setJogoRes=function(id,field,v){
 /* ════════════════════════════════════════
    CALCULOS DE RANKING
 ════════════════════════════════════════ */
-function norm(v){return String(v||'').trim().toLowerCase();}
+function norm(v){return String(v||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
 
 function calcTotals(){
   const users=allData.users||{};
