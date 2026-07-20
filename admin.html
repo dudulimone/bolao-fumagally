@@ -655,7 +655,7 @@ function renderResultados(){
       <div class="grid g4">
         <div class="field"><label>Campeao</label><input id="rCamp" list="teamsList" value="${esc(r.campeao||'')}" onchange="saveResultados()"></div>
         <div class="field"><label>Vice</label><input id="rVice" list="teamsList" value="${esc(r.vice||'')}" onchange="saveResultados()"></div>
-        <div class="field"><label>Artilheiro</label><input id="rArt" value="${esc(r.artilheiro||'')}" onchange="saveResultados()"></div>
+        <div class="field"><label>Artilheiro (variações separadas por |)</label><input id="rArt" value="${esc(r.artilheiro||'')}" placeholder="Ex: Mbappé|Mbappe|Kylian" onchange="saveResultados()"></div>
         <div class="field"><label>Semifinalistas (virgula)</label><input id="rSemis" value="${esc((r.semis||[]).join(', '))}" onchange="saveResultados()"></div>
       </div>
     </div>
@@ -744,7 +744,10 @@ function calcTotals(){
     const ag=meusPalpites['apostas_gerais']||{};
     if(norm(ag.campeao)&&norm(ag.campeao)===norm(r.campeao))gerais+=10;
     if(norm(ag.vice)&&norm(ag.vice)===norm(r.vice))gerais+=6;
-    if(norm(ag.art)&&norm(ag.art)===norm(r.artilheiro))gerais+=5;
+    if(norm(ag.art)&&norm(r.artilheiro)){
+      const aliases=(r.artilheiro||'').split('|').map(norm).filter(Boolean);
+      if(aliases.some(a=>a===norm(ag.art)))gerais+=5;
+    }
     // Todos os 4 semifinalistas pontuam — campeão e vice acumulam com os 10/6 pts
     [ag.s1,ag.s2,ag.s3,ag.s4].map(norm).filter(Boolean).forEach(s=>{if(realSemis.includes(s))gerais+=3;});
 
